@@ -1,0 +1,1 @@
+git-filter-repo  --> usunięcie elmentów z repo tak jakby ich nigdy nie było nawet z commitów (skrypt py)

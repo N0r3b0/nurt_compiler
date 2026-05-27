@@ -1,0 +1,3 @@
+https://gemini.google.com/app/074517f8d886d3ff -> Przygotowanie środowiska kompilatora C++20, ubuntu, wsl, specyfikacja składni języka
+
+https://gemini.google.com/app/9bfe978b40cc66c9 -> budowa kompilatora, czat PRO
