@@ -1,0 +1,29 @@
+{
+  "name": "nurt-lang",
+  "displayName": "Nurt Language",
+  "description": "Kolorowanie składni dla języka Nurt",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "nurt",
+        "aliases": ["Nurt", "nurt"],
+        "extensions": [".nrt"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "nurt",
+        "scopeName": "source.nurt",
+        "path": "./syntaxes/nurt.tmLanguage.json"
+      }
+    ]
+  }
+}

@@ -1,0 +1,119 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Nurt",
+  "scopeName": "source.nurt",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#keywords" },
+    { "include": "#variables" },
+    { "include": "#functions" },
+    { "include": "#operators" },
+    { "include": "#numbers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "match": "#(?!([A-Za-z_]|:)).*$",
+          "name": "comment.line.number-sign.nurt"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "begin": "\"",
+          "end": "\"",
+          "name": "string.quoted.double.nurt",
+          "patterns": [
+            {
+              "match": "\\\\[nt\"\\\\0]",
+              "name": "constant.character.escape.nurt"
+            }
+          ]
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "match": "\\b(powolaj|koniec|inaczej|dopoki|rob|dopasuj)\\b",
+          "name": "keyword.control.nurt"
+        },
+        {
+          "match": "\\b(prawda|falsz)\\b",
+          "name": "constant.language.boolean.nurt"
+        },
+        {
+          "match": "\\b(i|lub)\\b",
+          "name": "keyword.operator.logical.nurt"
+        }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        {
+          "match": "#[A-Za-z_][A-Za-z0-9_]*",
+          "name": "variable.other.int.nurt"
+        },
+        {
+          "match": "\\$[A-Za-z_][A-Za-z0-9_]*",
+          "name": "variable.other.string.nurt"
+        },
+        {
+          "match": "\\?[A-Za-z_][A-Za-z0-9_]*",
+          "name": "variable.other.bool.nurt"
+        }
+      ]
+    },
+    "functions": {
+      "patterns": [
+        {
+          "match": "\\b(pisz|bierz)\\b(?=\\s*\\()",
+          "name": "support.function.nurt"
+        },
+        {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\b(?=\\s*\\()",
+          "name": "entity.name.function.nurt"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "match": "(->|<-|=>)",
+          "name": "keyword.control.flow.nurt"
+        },
+        {
+          "match": "(==|!=|<=|>=|<|>)",
+          "name": "keyword.operator.comparison.nurt"
+        },
+        {
+          "match": "(\\+|-|\\*|/|%)",
+          "name": "keyword.operator.arithmetic.nurt"
+        },
+        {
+          "match": "!",
+          "name": "keyword.operator.logical.nurt"
+        },
+        {
+          "match": "\\?(?![A-Za-z_])",
+          "name": "keyword.control.query.nurt"
+        },
+        {
+          "match": "\\|",
+          "name": "keyword.operator.pipe.nurt"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "match": "\\b[0-9]+\\b",
+          "name": "constant.numeric.int.nurt"
+        }
+      ]
+    }
+  }
+}
