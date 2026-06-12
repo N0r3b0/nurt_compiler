@@ -1,0 +1,36 @@
+# liczba_pierwsza.nrt - benchmark 4: test pierwszosci
+# Testuje intensywna iteracje petli matematycznej (dzielenie probne
+# do pierwiastka: #d * #d <= #n) oraz logike stanu logicznego.
+
+powolaj czy_pierwsza(#n) -> ?:
+    #n < 2 ?
+    | prawda =>:
+        <- falsz
+    | falsz =>:
+        prawda -> ?wynik
+        2 -> #d
+        dopoki #d * #d <= #n i ?wynik rob:
+            #n % #d == 0 ?
+            | prawda =>:
+                falsz -> ?wynik
+            | falsz =>:
+                #d + 1 -> #d
+            koniec
+        koniec
+        <- ?wynik
+    koniec
+koniec
+
+0 -> #licznik
+2 -> #n
+dopoki #n < 10000 rob:
+    czy_pierwsza(#n) ?
+    | prawda =>:
+        #licznik + 1 -> #licznik
+    koniec
+    #n + 1 -> #n
+koniec
+pisz("liczb pierwszych ponizej 10000: ", #licznik, "\n")
+
+pisz("czy_pierwsza(2147483647) = ", czy_pierwsza(2147483647), "\n")
+pisz("czy_pierwsza(2147483646) = ", czy_pierwsza(2147483646), "\n")

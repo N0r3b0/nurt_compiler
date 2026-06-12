@@ -1,0 +1,67 @@
+# kalkulator.nrt - benchmark 3: kalkulator
+# Testuje struktury warunkowe, porownania napisow (lancuch strcmp)
+# oraz wielogaleziowa emisje 'dopasuj' (na napisie i na liczbie).
+# Wersja deterministyczna (bez bierz()) na potrzeby pomiarow.
+
+powolaj oblicz(#a, $op, #b) -> #:
+    dopasuj $op
+    | "+" =>:
+        <- #a + #b
+    | "-" =>:
+        <- #a - #b
+    | "*" =>:
+        <- #a * #b
+    | "/" =>:
+        #b == 0 ?
+        | prawda =>:
+            pisz("blad: dzielenie przez zero\n")
+            <- 0
+        | falsz =>:
+            <- #a / #b
+        koniec
+    | "%" =>:
+        <- #a % #b
+    | inaczej =>:
+        pisz("nieznany operator: ", $op, "\n")
+        <- 0
+    koniec
+koniec
+
+powolaj opisz(#wynik):
+    dopasuj #wynik
+    | 0 =>:
+        pisz("wynik zerowy\n")
+    | 42 =>:
+        pisz("odpowiedz na wszystko!\n")
+    | inaczej =>:
+        #wynik > 0 i #wynik % 2 == 0 ?
+        | prawda =>:
+            pisz("wynik dodatni i parzysty\n")
+        | falsz =>:
+            pisz("wynik ujemny lub nieparzysty\n")
+        koniec
+    koniec
+koniec
+
+pisz("84 + 42 = ", oblicz(84, "+", 42), "\n")
+pisz("84 - 42 = ", oblicz(84, "-", 42), "\n")
+pisz("84 * 42 = ", oblicz(84, "*", 42), "\n")
+pisz("84 / 42 = ", oblicz(84, "/", 42), "\n")
+pisz("84 % 42 = ", oblicz(84, "%", 42), "\n")
+pisz("84 / 0 = ", oblicz(84, "/", 0), "\n")
+pisz("84 ^ 42 = ", oblicz(84, "^", 42), "\n")
+
+opisz(oblicz(84, "-", 42))
+opisz(oblicz(84, "%", 42))
+opisz(oblicz(84, "+", 42))
+opisz(oblicz(42, "-", 84))
+
+0 -> #idx
+0 -> #suma
+dopoki #idx < 1000 rob:
+    #suma + oblicz(#idx, "+", 7) -> #suma
+    #suma + oblicz(#idx, "*", 3) -> #suma
+    #suma + oblicz(#idx, "%", 13) -> #suma
+    #idx + 1 -> #idx
+koniec
+pisz("suma kontrolna = ", #suma, "\n")

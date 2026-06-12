@@ -17,6 +17,9 @@ enum class TokenType {
     KwRob,      ///< 'rob'     - do (opens a loop body)
     KwPrawda,   ///< 'prawda'  - boolean literal true
     KwFalsz,    ///< 'falsz'   - boolean literal false
+    KwDopasuj,  ///< 'dopasuj' - multi-branch match statement
+    KwI,        ///< 'i'       - logical AND operator
+    KwLub,      ///< 'lub'     - logical OR operator
 
     // --- Type sigils ---------------------------------------------------------
     HashSigil,      ///< '#' - 64-bit signed integer
@@ -49,9 +52,8 @@ enum class TokenType {
     GreaterEqual,  ///< '>='
 
     // --- Logical operators ---------------------------------------------------
-    Bang,      ///< '!'
-    AmpAmp,    ///< '&&'
-    PipePipe,  ///< '||'
+    // Binary logical AND/OR are the keywords 'i' and 'lub' (KwI, KwLub).
+    Bang,  ///< '!'
 
     // --- Punctuation ---------------------------------------------------------
     LParen,  ///< '('
@@ -81,6 +83,12 @@ enum class TokenType {
         return "KwPrawda";
     case TokenType::KwFalsz:
         return "KwFalsz";
+    case TokenType::KwDopasuj:
+        return "KwDopasuj";
+    case TokenType::KwI:
+        return "KwI";
+    case TokenType::KwLub:
+        return "KwLub";
     case TokenType::HashSigil:
         return "HashSigil";
     case TokenType::DollarSigil:
@@ -123,10 +131,6 @@ enum class TokenType {
         return "GreaterEqual";
     case TokenType::Bang:
         return "Bang";
-    case TokenType::AmpAmp:
-        return "AmpAmp";
-    case TokenType::PipePipe:
-        return "PipePipe";
     case TokenType::LParen:
         return "LParen";
     case TokenType::RParen:
@@ -146,7 +150,7 @@ enum class TokenType {
 }
 
 [[nodiscard]] constexpr bool is_keyword(TokenType type) {
-    return type >= TokenType::KwPowolaj && type <= TokenType::KwFalsz;
+    return type >= TokenType::KwPowolaj && type <= TokenType::KwLub;
 }
 
 struct Token {

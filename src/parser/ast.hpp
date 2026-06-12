@@ -64,6 +64,7 @@ enum class NodeKind {
     ExpressionStatement,
     Return,
     IfStatement,
+    MatchStatement,
     While,
     FunctionDef,
 
@@ -167,8 +168,8 @@ enum class BinaryOp {
     LessEqual,     ///< '<='
     Greater,       ///< '>'
     GreaterEqual,  ///< '>='
-    And,           ///< '&&'
-    Or,            ///< '||'
+    And,           ///< 'i'
+    Or,            ///< 'lub'
 };
 
 [[nodiscard]] constexpr std::string_view binary_op_name(BinaryOp op) {
@@ -196,9 +197,9 @@ enum class BinaryOp {
     case BinaryOp::GreaterEqual:
         return ">=";
     case BinaryOp::And:
-        return "&&";
+        return "i";
     case BinaryOp::Or:
-        return "||";
+        return "lub";
     }
     return "<invalid>";
 }
@@ -281,6 +282,36 @@ struct IfStatementNode final : StatementNode {
     ExprPtr condition;
     StatementList trueBranch;
     StatementList falseBranch;
+};
+
+/// One literal branch of a 'dopasuj' statement.
+struct MatchCase {
+    /// Always a literal node (IntegerLiteralNode, StringLiteralNode, or
+    /// BoolLiteralNode); the parser rejects anything else.
+    ExprPtr literal;
+    StatementList body;
+    SourceLocation location;
+};
+
+/// The multi-branch match statement:
+///   dopasuj [target]
+///   | 1 =>:
+///       [statements]
+///   | 2 =>:
+///       [statements]
+///   | inaczej =>:
+///       [statements]
+///   koniec
+/// The 'inaczej' (default) branch is mandatory and must come last.
+struct MatchStatementNode final : StatementNode {
+    MatchStatementNode(ExprPtr matchTarget, std::vector<MatchCase> matchCases,
+                       StatementList defaultBody, SourceLocation loc)
+        : StatementNode(NodeKind::MatchStatement, loc), target(std::move(matchTarget)),
+          cases(std::move(matchCases)), defaultBranch(std::move(defaultBody)) {}
+
+    ExprPtr target;
+    std::vector<MatchCase> cases;
+    StatementList defaultBranch;
 };
 
 /// 'dopoki [condition] rob: [statements] koniec'

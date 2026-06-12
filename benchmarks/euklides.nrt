@@ -1,0 +1,33 @@
+# euklides.nrt - benchmark 2: NWD (algorytm Euklidesa)
+# Testuje petle 'dopoki', arytmetyke modulo oraz gleboka sciezke rekurencji
+# (kolejne liczby Fibonacciego to najgorszy przypadek algorytmu Euklidesa).
+
+powolaj nwd_petla(#a, #b) -> #:
+    dopoki #b != 0 rob:
+        #a % #b -> #reszta
+        #b -> #a
+        #reszta -> #b
+    koniec
+    <- #a
+koniec
+
+powolaj nwd_rekurencja(#a, #b) -> #:
+    #b == 0 ?
+    | prawda =>:
+        <- #a
+    | falsz =>:
+        <- nwd_rekurencja(#b, #a % #b)
+    koniec
+koniec
+
+pisz("nwd_petla(1071, 462) = ", nwd_petla(1071, 462), "\n")
+pisz("nwd_rekurencja(1134903170, 701408733) = ", nwd_rekurencja(1134903170, 701408733), "\n")
+
+0 -> #idx
+0 -> #suma
+dopoki #idx < 1000 rob:
+    #suma + nwd_petla(#idx * 1071, 462) -> #suma
+    #suma + nwd_rekurencja(#idx * 1071, 462) -> #suma
+    #idx + 1 -> #idx
+koniec
+pisz("suma kontrolna = ", #suma, "\n")

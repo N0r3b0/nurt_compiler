@@ -44,13 +44,22 @@ std::vector<TokenType> typesOf(const std::vector<Token>& tokens) {
 // --- Keywords ----------------------------------------------------------------
 
 TEST(LexerKeywords, AllPolishKeywordsAreRecognized) {
-    const LexResult result = lex("powolaj koniec inaczej dopoki rob prawda falsz");
+    const LexResult result = lex("powolaj koniec inaczej dopoki rob prawda falsz dopasuj i lub");
     EXPECT_EQ(result.errorCount, 0u);
     EXPECT_EQ(typesOf(result.tokens),
               (std::vector<TokenType>{
                   TokenType::KwPowolaj, TokenType::KwKoniec, TokenType::KwInaczej,
                   TokenType::KwDopoki, TokenType::KwRob, TokenType::KwPrawda, TokenType::KwFalsz,
-                  TokenType::EndOfFile}));
+                  TokenType::KwDopasuj, TokenType::KwI, TokenType::KwLub, TokenType::EndOfFile}));
+}
+
+TEST(LexerKeywords, LogicalKeywordPrefixesAreIdentifiers) {
+    // 'i'/'lub'/'dopasuj' are reserved, but words merely starting with them
+    // stay ordinary identifiers.
+    const LexResult result = lex("igla lubie dopasujmy");
+    EXPECT_EQ(typesOf(result.tokens),
+              (std::vector<TokenType>{TokenType::Identifier, TokenType::Identifier,
+                                      TokenType::Identifier, TokenType::EndOfFile}));
 }
 
 TEST(LexerKeywords, KeywordsAreCaseSensitive) {
@@ -171,13 +180,25 @@ TEST(LexerArrows, LessThanNegativeNeedsSpace) {
 // --- Operators and punctuation ---------------------------------------------------
 
 TEST(LexerOperators, ArithmeticLogicalAndPunctuation) {
-    const LexResult result = lex("+ - * / % ! && || ( ) ,");
+    const LexResult result = lex("+ - * / % ! ( ) ,");
     EXPECT_EQ(typesOf(result.tokens),
               (std::vector<TokenType>{TokenType::Plus, TokenType::Minus, TokenType::Star,
                                       TokenType::Slash, TokenType::Percent, TokenType::Bang,
-                                      TokenType::AmpAmp, TokenType::PipePipe, TokenType::LParen,
-                                      TokenType::RParen, TokenType::Comma, TokenType::EndOfFile}));
+                                      TokenType::LParen, TokenType::RParen, TokenType::Comma,
+                                      TokenType::EndOfFile}));
     EXPECT_EQ(result.errorCount, 0u);
+}
+
+TEST(LexerOperators, SymbolicLogicalOperatorsAreCleanErrors) {
+    const LexResult andResult = lex("?a && ?b");
+    ASSERT_EQ(andResult.errorCount, 1u);
+    EXPECT_EQ(andResult.tokens[2].type, TokenType::Unknown);
+    EXPECT_NE(andResult.diagnostics[0].message.find("keyword 'i'"), std::string::npos);
+
+    const LexResult orResult = lex("?a || ?b");
+    ASSERT_EQ(orResult.errorCount, 1u);
+    EXPECT_EQ(orResult.tokens[2].type, TokenType::Unknown);
+    EXPECT_NE(orResult.diagnostics[0].message.find("keyword 'lub'"), std::string::npos);
 }
 
 TEST(LexerOperators, StrayCharactersProduceErrors) {
@@ -189,10 +210,10 @@ TEST(LexerOperators, StrayCharactersProduceErrors) {
 }
 
 TEST(LexerOperators, QueryAndBlockTokens) {
-    const LexResult result = lex("| => : ||");
+    const LexResult result = lex("| => :");
     EXPECT_EQ(typesOf(result.tokens),
               (std::vector<TokenType>{TokenType::Pipe, TokenType::FatArrow, TokenType::Colon,
-                                      TokenType::PipePipe, TokenType::EndOfFile}));
+                                      TokenType::EndOfFile}));
     EXPECT_EQ(result.errorCount, 0u);
 }
 

@@ -1,6 +1,6 @@
 # Nurt Language Specification
 
-Status: Step 3 (lexical structure + grammar + static semantics). This document grows with each compiler stage.
+Status: Step 5 (full pipeline incl. codegen; `dopasuj` match statement and keyword logical operators `i`/`lub`). This document grows with each compiler stage.
 
 ## 1. Source files
 
@@ -35,13 +35,18 @@ space, `#` at end of line, `#1`, `#!`, ...) it starts a comment.
 | --- | --- | --- |
 | `powolaj` | `KwPowolaj` | defines (summons) a function |
 | `koniec` | `KwKoniec` | ends a block |
-| `inaczej` | `KwInaczej` | else branch |
+| `inaczej` | `KwInaczej` | default branch of `dopasuj` |
 | `dopoki` | `KwDopoki` | while |
 | `rob` | `KwRob` | do (opens a loop body) |
 | `prawda` | `KwPrawda` | boolean literal true |
 | `falsz` | `KwFalsz` | boolean literal false |
+| `dopasuj` | `KwDopasuj` | multi-branch match statement |
+| `i` | `KwI` | logical AND operator |
+| `lub` | `KwLub` | logical OR operator |
 
-Keywords are reserved and case-sensitive.
+Keywords are reserved and case-sensitive. In particular `i` and `lub` cannot be
+used as identifiers (`#i` is a lexical/syntactic error); words merely starting
+with a keyword (`igla`, `lubie`, `dopasujmy`) remain ordinary identifiers.
 
 ### 2.4 Type sigils
 
@@ -85,12 +90,15 @@ An unknown escape or an unterminated string is a lexical error.
 | --- | --- |
 | Arithmetic | `+` `-` `*` `/` `%` |
 | Comparison | `==` `!=` `<` `<=` `>` `>=` |
-| Logical | `!` `&&` `\|\|` |
+| Logical | `!` and the keywords `i` (AND), `lub` (OR) |
 | Punctuation | `(` `)` `,` `:` `\|` |
 
 Note: `<` followed by `-` always lexes as `ReturnArrow` (`<-`). Write `a < -b` with a
 space to express "less than negative b". A lone `=` or `&` is a lexical error.
-A lone `\|` (token `Pipe`) introduces a branch in a control flow query.
+A lone `\|` (token `Pipe`) introduces a branch in a control flow query or a
+`dopasuj` case. The symbolic logical operators `&&` and `\|\|` were removed in
+favour of `i`/`lub`; both now produce a dedicated lexical error pointing at the
+keyword replacement.
 
 ## 3. Grammar
 
@@ -105,6 +113,7 @@ program        = { statement } ;
 
 statement      = functionDef
                | whileLoop
+               | matchStmt
                | returnStmt
                | exprLedStmt ;
 
@@ -115,6 +124,12 @@ functionDef    = "powolaj" IDENT "(" [ paramList ] ")"
 paramList      = SIGIL IDENT { "," SIGIL IDENT } ;
 
 whileLoop      = "dopoki" expression "rob" [ ":" ] { statement } "koniec" ;
+
+matchStmt      = "dopasuj" expression
+                     { "|" caseLiteral "=>" ":" { statement } }
+                     "|" "inaczej" "=>" ":" { statement }
+                 "koniec" ;
+caseLiteral    = INTEGER | "-" INTEGER | STRING | "prawda" | "falsz" ;
 
 returnStmt     = "<-" [ expression ] ;
 
@@ -127,8 +142,8 @@ queryBranches  = branch { branch } "koniec" ;
 branch         = "|" ( "prawda" | "falsz" ) "=>" ":" { statement } ;
 
 expression     = orExpr ;
-orExpr         = andExpr  { "||" andExpr } ;
-andExpr        = equality { "&&" equality } ;
+orExpr         = andExpr  { "lub" andExpr } ;
+andExpr        = equality { "i" equality } ;
 equality       = comparison { ( "==" | "!=" ) comparison } ;
 comparison     = additive { ( "<" | "<=" | ">" | ">=" ) additive } ;
 additive       = multiplicative { ( "+" | "-" ) multiplicative } ;
@@ -164,6 +179,21 @@ SIGIL          = "#" | "$" | "?" ;
   reference; a `?` *not* followed by an identifier is the query marker.
 - **Loop**: `dopoki [condition] rob: [statements] koniec`. The `:` after `rob`
   is optional.
+- **Match**: `dopasuj` evaluates a target expression once and dispatches to the
+  first case whose literal equals the target's value. Cases hold literals only
+  (integers, optionally negative; strings; `prawda`/`falsz`). The `inaczej`
+  branch is **mandatory** and must come **last**.
+
+  ```nurt
+  dopasuj #x
+  | 1 =>:
+      pisz("jeden\n")
+  | 2 =>:
+      pisz("dwa\n")
+  | inaczej =>:
+      pisz("inne\n")
+  koniec
+  ```
 - **Function**: `powolaj name(params) -> #: [statements] koniec`. The return
   type annotation `-> #:` (or `$:` / `?:`) is omitted for void functions; the
   block-opening `:` is optional. The `#` sigil must be written glued to the `:`
@@ -190,8 +220,8 @@ From loosest to tightest; all binary operators are left-associative:
 
 | Level | Operators |
 | --- | --- |
-| 1 | `\|\|` |
-| 2 | `&&` |
+| 1 | `lub` |
+| 2 | `i` |
 | 3 | `==` `!=` |
 | 4 | `<` `<=` `>` `>=` |
 | 5 | `+` `-` |
@@ -241,7 +271,7 @@ going after an error so all problems in a file are reported in one pass.
 | `+` `-` `*` `/` `%` | int, int | int |
 | `<` `<=` `>` `>=` | int, int | bool |
 | `==` `!=` | both the same type | bool |
-| `&&` `\|\|` | bool, bool | bool |
+| `i` `lub` | bool, bool | bool |
 | unary `-` | int | int |
 | `!` | bool | bool |
 
@@ -256,7 +286,19 @@ no value and cannot appear where a value is required.
 - An expression statement whose value is not void produces a *warning* (the
   result is silently discarded).
 
-### 4.5 Built-in functions
+### 4.5 `dopasuj` matching
+
+- The target must have a value (a void call cannot be matched).
+- Every case literal must have **exactly** the target's type; there are no
+  conversions (`dopasuj #x` with a case `"jeden"` is an error).
+- **Duplicate case values** within one `dopasuj` are errors. Equality follows
+  the value, not the spelling: two `7` cases collide, two `"x"` cases collide,
+  and `prawda`/`falsz` may each appear at most once.
+- Return path coverage: a `dopasuj` guarantees a return only when **every**
+  case body *and* the `inaczej` body guarantee one. Cases are never assumed
+  exhaustive — the mandatory `inaczej` covers all unmatched values.
+
+### 4.6 Built-in functions
 
 - `pisz(a, b, ...)` accepts **one or more** arguments of any value type
   (int, string, bool) and yields no value.

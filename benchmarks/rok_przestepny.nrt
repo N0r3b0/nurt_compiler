@@ -1,0 +1,23 @@
+# rok_przestepny.nrt - benchmark 5: rok przestepny
+# Testuje zagniezdzone warunki zlozone z polskich operatorow 'i' / 'lub':
+# (rok % 4 == 0 i rok % 100 != 0) lub rok % 400 == 0.
+
+powolaj czy_przestepny(#rok) -> ?:
+    <- (#rok % 4 == 0 i #rok % 100 != 0) lub #rok % 400 == 0
+koniec
+
+0 -> #licznik
+1 -> #rok
+dopoki #rok <= 400000 rob:
+    czy_przestepny(#rok) ?
+    | prawda =>:
+        #licznik + 1 -> #licznik
+    koniec
+    #rok + 1 -> #rok
+koniec
+pisz("lata przestepne w zakresie 1..400000: ", #licznik, "\n")
+
+pisz("rok 1900: ", czy_przestepny(1900), "\n")
+pisz("rok 2000: ", czy_przestepny(2000), "\n")
+pisz("rok 2024: ", czy_przestepny(2024), "\n")
+pisz("rok 2026: ", czy_przestepny(2026), "\n")

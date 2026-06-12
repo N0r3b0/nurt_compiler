@@ -1,0 +1,5 @@
+# witaj.nrt - benchmark 1: Hello World
+# Testuje bazowe I/O oraz odwzorowanie statycznego napisu w sekcji .rodata.
+
+"Witaj, swiecie!\n" -> $powitanie
+pisz($powitanie)

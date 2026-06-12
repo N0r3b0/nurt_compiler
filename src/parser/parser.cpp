@@ -15,9 +15,9 @@ struct BinaryOpInfo {
 /// Precedence table for the Pratt-style expression parser.
 [[nodiscard]] std::optional<BinaryOpInfo> binaryOpInfo(TokenType type) {
     switch (type) {
-    case TokenType::PipePipe:
+    case TokenType::KwLub:
         return BinaryOpInfo{BinaryOp::Or, 1};
-    case TokenType::AmpAmp:
+    case TokenType::KwI:
         return BinaryOpInfo{BinaryOp::And, 2};
     case TokenType::EqualEqual:
         return BinaryOpInfo{BinaryOp::Equal, 3};
@@ -146,6 +146,8 @@ StmtPtr Parser::parseStatement() {
         return parseFunctionDef();
     case TokenType::KwDopoki:
         return parseWhile();
+    case TokenType::KwDopasuj:
+        return parseMatch();
     case TokenType::ReturnArrow:
         return parseReturn();
     case TokenType::EndOfFile:
@@ -347,6 +349,112 @@ StmtPtr Parser::parseQueryBranches(ExprPtr condition, SourceLocation queryLocati
                                              std::move(falseBranch), queryLocation);
 }
 
+StmtPtr Parser::parseMatch() {
+    const SourceLocation location = peek().location;
+    advance();  // 'dopasuj'
+
+    ExprPtr target = parseExpression();
+    if (!target) {
+        return nullptr;
+    }
+
+    if (!check(TokenType::Pipe)) {
+        errorAt(peek(), "expected '|' to open the first 'dopasuj' branch");
+        return nullptr;
+    }
+
+    std::vector<MatchCase> cases;
+    StatementList defaultBranch;
+    bool sawInaczej = false;
+
+    while (match(TokenType::Pipe)) {
+        const Token& branchToken = peek();
+
+        if (match(TokenType::KwInaczej)) {
+            if (expect(TokenType::FatArrow, "'=>' after 'inaczej'") == nullptr) {
+                return nullptr;
+            }
+            if (expect(TokenType::Colon, "':' after '=>'") == nullptr) {
+                return nullptr;
+            }
+            StatementList body = parseBlock(/*stopAtPipe=*/true);
+            if (sawInaczej) {
+                errorAt(branchToken, "duplicate 'inaczej' branch in 'dopasuj'");
+            } else {
+                defaultBranch = std::move(body);
+                sawInaczej = true;
+            }
+            continue;
+        }
+
+        if (sawInaczej) {
+            errorAt(branchToken, "'inaczej' must be the last branch of 'dopasuj'");
+            // Keep parsing the misplaced branch so later errors still surface.
+        }
+
+        ExprPtr literal = parseCaseLiteral();
+        if (!literal) {
+            return nullptr;
+        }
+        if (expect(TokenType::FatArrow, "'=>' after the case literal") == nullptr) {
+            return nullptr;
+        }
+        if (expect(TokenType::Colon, "':' after '=>'") == nullptr) {
+            return nullptr;
+        }
+
+        MatchCase matchCase;
+        matchCase.location = literal->location;
+        matchCase.literal = std::move(literal);
+        matchCase.body = parseBlock(/*stopAtPipe=*/true);
+        cases.push_back(std::move(matchCase));
+    }
+
+    if (!sawInaczej) {
+        errorAt(peek(), "'dopasuj' requires a final '| inaczej =>:' branch");
+    }
+    if (expect(TokenType::KwKoniec, "'koniec' to close 'dopasuj'") == nullptr) {
+        return nullptr;
+    }
+    if (!sawInaczej) {
+        return nullptr;
+    }
+
+    return std::make_unique<MatchStatementNode>(std::move(target), std::move(cases),
+                                                std::move(defaultBranch), location);
+}
+
+ExprPtr Parser::parseCaseLiteral() {
+    const Token& token = peek();
+    switch (token.type) {
+    case TokenType::IntegerLiteral:
+        advance();
+        return std::make_unique<IntegerLiteralNode>(token.intValue, token.location);
+    case TokenType::Minus: {
+        advance();
+        const Token* number =
+            expect(TokenType::IntegerLiteral, "an integer literal after '-' in a 'dopasuj' case");
+        if (number == nullptr) {
+            return nullptr;
+        }
+        return std::make_unique<IntegerLiteralNode>(-number->intValue, token.location);
+    }
+    case TokenType::StringLiteral:
+        advance();
+        return std::make_unique<StringLiteralNode>(token.stringValue, token.location);
+    case TokenType::KwPrawda:
+        advance();
+        return std::make_unique<BoolLiteralNode>(true, token.location);
+    case TokenType::KwFalsz:
+        advance();
+        return std::make_unique<BoolLiteralNode>(false, token.location);
+    default:
+        errorAt(token, "expected a literal (e.g. '42', '\"napis\"', 'prawda') or 'inaczej' "
+                       "as a 'dopasuj' case");
+        return nullptr;
+    }
+}
+
 StatementList Parser::parseBlock(bool stopAtPipe) {
     StatementList statements;
     while (!atEnd() && !check(TokenType::KwKoniec) && !(stopAtPipe && check(TokenType::Pipe))) {
@@ -533,6 +641,7 @@ void Parser::synchronize() {
         switch (peek().type) {
         case TokenType::KwPowolaj:
         case TokenType::KwDopoki:
+        case TokenType::KwDopasuj:
         case TokenType::ReturnArrow:
         case TokenType::KwKoniec:
         case TokenType::Pipe:

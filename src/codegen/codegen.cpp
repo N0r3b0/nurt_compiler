@@ -1,6 +1,7 @@
 #include "codegen/codegen.hpp"
 
 #include <array>
+#include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>
@@ -252,6 +253,14 @@ void CodeGenerator::collectLocalsIn(const StatementNode& statement) {
         collectLocals(node.falseBranch);
         break;
     }
+    case NodeKind::MatchStatement: {
+        const auto& node = static_cast<const MatchStatementNode&>(statement);
+        for (const MatchCase& matchCase : node.cases) {
+            collectLocals(matchCase.body);
+        }
+        collectLocals(node.defaultBranch);
+        break;
+    }
     case NodeKind::While: {
         const auto& node = static_cast<const WhileNode&>(statement);
         collectLocals(node.body);
@@ -287,6 +296,9 @@ void CodeGenerator::emitStatement(const StatementNode& statement) {
         break;
     case NodeKind::IfStatement:
         emitIf(static_cast<const IfStatementNode&>(statement));
+        break;
+    case NodeKind::MatchStatement:
+        emitMatch(static_cast<const MatchStatementNode&>(statement));
         break;
     case NodeKind::While:
         emitWhile(static_cast<const WhileNode&>(statement));
@@ -353,6 +365,75 @@ void CodeGenerator::emitIf(const IfStatementNode& node) {
     line("jmp " + koniec);
     label(falsz);
     emitBlock(node.falseBranch);
+    label(koniec);
+}
+
+void CodeGenerator::emitMatch(const MatchStatementNode& node) {
+    const int id = nextLabelId_++;
+    const std::string inaczej = ".inaczej_" + std::to_string(id);
+    const std::string koniec = ".koniec_dopasuj_" + std::to_string(id);
+    const auto caseLabel = [id](std::size_t k) {
+        return ".przypadek_" + std::to_string(id) + "_" + std::to_string(k);
+    };
+
+    const Type targetType = exprType(*node.target);
+
+    comment("dopasuj " + std::to_string(id));
+    emitExpression(*node.target);
+
+    const bool isString = targetType == Type::String;
+    if (isString) {
+        // Park the target pointer on the stack: strcmp clobbers rax, and each
+        // case must compare against the original target.
+        line("push rax");
+    }
+
+    // Dispatch chain: one test per case, falling through to 'inaczej'.
+    for (std::size_t k = 0; k < node.cases.size(); ++k) {
+        const ExpressionNode& literal = *node.cases[k].literal;
+        if (isString) {
+            const auto& value = static_cast<const StringLiteralNode&>(literal).value;
+            line("mov rdi, [rsp]");
+            line("lea rsi, [" + stringLabel(value) + "]");
+            emitAlignedCall("strcmp", /*variadic=*/false);
+            line("cmp eax, 0");
+            line("je " + caseLabel(k));
+            continue;
+        }
+
+        std::int64_t value = 0;
+        if (literal.kind == NodeKind::IntegerLiteral) {
+            value = static_cast<const IntegerLiteralNode&>(literal).value;
+        } else {
+            value = static_cast<const BoolLiteralNode&>(literal).value ? 1 : 0;
+        }
+        if (value >= INT32_MIN && value <= INT32_MAX) {
+            line("cmp rax, " + std::to_string(value));
+        } else {
+            // 'cmp r64, imm' only takes a sign-extended 32-bit immediate.
+            line("mov rcx, " + std::to_string(value));
+            line("cmp rax, rcx");
+        }
+        line("je " + caseLabel(k));
+    }
+    line("jmp " + inaczej);
+
+    // Case bodies. String matching parked the target with 'push'; every body
+    // is entered through exactly one label, so it is dropped exactly once.
+    for (std::size_t k = 0; k < node.cases.size(); ++k) {
+        label(caseLabel(k));
+        if (isString) {
+            line("add rsp, 8");
+        }
+        emitBlock(node.cases[k].body);
+        line("jmp " + koniec);
+    }
+
+    label(inaczej);
+    if (isString) {
+        line("add rsp, 8");
+    }
+    emitBlock(node.defaultBranch);
     label(koniec);
 }
 

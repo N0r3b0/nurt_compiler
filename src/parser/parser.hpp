@@ -17,10 +17,15 @@ namespace nurt {
 /// Grammar summary (see docs/language-spec.md for the full grammar):
 ///
 ///   program        := statement*
-///   statement      := functionDef | whileLoop | returnStmt | exprLedStmt
+///   statement      := functionDef | whileLoop | matchStmt | returnStmt | exprLedStmt
 ///   functionDef    := 'powolaj' IDENT '(' paramList? ')' ('->' SIGIL)? ':'?
 ///                         statement* 'koniec'
 ///   whileLoop      := 'dopoki' expression 'rob' ':'? statement* 'koniec'
+///   matchStmt      := 'dopasuj' expression
+///                         ( '|' caseLiteral '=>' ':' statement* )*
+///                         '|' 'inaczej' '=>' ':' statement*
+///                     'koniec'
+///   caseLiteral    := INTEGER | '-' INTEGER | STRING | 'prawda' | 'falsz'
 ///   returnStmt     := '<-' expression?
 ///   exprLedStmt    := expression ( '->' SIGIL IDENT      ; assignment
 ///                                | '?' queryBranches     ; control flow query
@@ -28,7 +33,7 @@ namespace nurt {
 ///   queryBranches  := ( '|' ('prawda'|'falsz') '=>' ':' statement* )+ 'koniec'
 ///
 /// Expressions use precedence climbing (Pratt parsing). From loosest to
-/// tightest: '||', '&&', equality, comparison, additive, multiplicative,
+/// tightest: 'lub', 'i', equality, comparison, additive, multiplicative,
 /// unary ('-' '!'), primary. All binary operators are left-associative.
 ///
 /// On a syntax error the parser reports a diagnostic and synchronizes to the
@@ -62,7 +67,12 @@ private:
     [[nodiscard]] StmtPtr parseStatement();
     [[nodiscard]] StmtPtr parseFunctionDef();
     [[nodiscard]] StmtPtr parseWhile();
+    [[nodiscard]] StmtPtr parseMatch();
     [[nodiscard]] StmtPtr parseReturn();
+
+    /// A 'dopasuj' case label: a literal of any value type, with an optional
+    /// leading '-' for negative integers.
+    [[nodiscard]] ExprPtr parseCaseLiteral();
 
     /// Statements that begin with an expression: assignment, control flow
     /// query, or a bare expression statement.

@@ -98,6 +98,24 @@ private:
             printBranch("FalszBranch", node.falseBranch);
             break;
         }
+        case NodeKind::MatchStatement: {
+            const auto& node = static_cast<const MatchStatementNode&>(statement);
+            line() << "MatchStatement\n";
+            Indent guard(*this);
+            line() << "Target\n";
+            {
+                Indent targetGuard(*this);
+                printExpression(*node.target);
+            }
+            for (const MatchCase& matchCase : node.cases) {
+                line() << "Case\n";
+                Indent caseGuard(*this);
+                printExpression(*matchCase.literal);
+                printBranch("Body", matchCase.body);
+            }
+            printBranch("InaczejBranch", node.defaultBranch);
+            break;
+        }
         case NodeKind::While: {
             const auto& node = static_cast<const WhileNode&>(statement);
             line() << "While\n";

@@ -18,7 +18,11 @@ target_link_libraries(parser_tests PRIVATE nurt_core nurt_warnings GTest::gtest_
 add_executable(semantic_tests semantic_tests.cpp)
 target_link_libraries(semantic_tests PRIVATE nurt_core nurt_warnings GTest::gtest_main)
 
+add_executable(dopasuj_tests dopasuj_tests.cpp)
+target_link_libraries(dopasuj_tests PRIVATE nurt_core nurt_warnings GTest::gtest_main)
+
 include(GoogleTest)
 gtest_discover_tests(lexer_tests)
 gtest_discover_tests(parser_tests)
 gtest_discover_tests(semantic_tests)
+gtest_discover_tests(dopasuj_tests)

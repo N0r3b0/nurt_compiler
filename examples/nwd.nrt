@@ -51,7 +51,7 @@ pisz("nwd_rekurencja(", #x, ", ", #y, ") = ", nwd_rekurencja(#x, #y), "\n")
 nwd_modulo(8126, 7344) -> #m
 nwd_odejmowanie(8126, 7344) -> #o
 nwd_rekurencja(8126, 7344) -> #r
-#m == #o && #o == #r -> ?zgodne
+#m == #o i #o == #r -> ?zgodne
 
 ?zgodne ?
 | prawda =>:

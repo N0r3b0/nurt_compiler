@@ -85,8 +85,8 @@ priorytetów (od najsłabiej do najsilniej wiążących):
 
 | Poziom | Operatory | Wynik typowy |
 | --- | --- | --- |
-| 1 | `\|\|` | bool |
-| 2 | `&&` | bool |
+| 1 | `lub` | bool |
+| 2 | `i` | bool |
 | 3 | `==` `!=` | bool |
 | 4 | `<` `<=` `>` `>=` | bool |
 | 5 | `+` `-` | int |
@@ -96,6 +96,19 @@ priorytetów (od najsłabiej do najsilniej wiążących):
 Rozwiązanie to łączy zwięzłość parsera tabelarycznego (jeden punkt prawdy —
 tabela priorytetów) z czytelnością rekurencji zstępującej i pozostaje w pełni
 deterministyczne, bez nawrotów (*backtracking*).
+
+Operatory logiczne są **słowami kluczowymi** języka: `i` (koniunkcja, wiąże
+silniej) oraz `lub` (alternatywa, wiąże słabiej) — zgodnie z polską
+tożsamością języka. Z perspektywy Pratt parsingu słowo kluczowe jest
+pełnoprawnym tokenem infiksowym; tabela operatorów dwuargumentowych odwzorowuje
+`KwLub` i `KwI` na poziomy 1 i 2 dokładnie tak samo, jak tokeny symboliczne.
+Historyczne symbole `&&` i `\|\|` zostały usunięte ze zbioru tokenów: lekser
+zgłasza dla nich dedykowany błąd leksykalny wskazujący zamiennik słownikowy,
+co wyklucza ciche, częściowe rozpoznanie (np. `\|\|` jako dwa markery gałęzi).
+Konsekwencją rezerwacji jest niedostępność `i` oraz `lub` jako identyfikatorów;
+słowa jedynie rozpoczynające się od słowa kluczowego (`igla`, `lubie`,
+`dopasujmy`) pozostają zwykłymi identyfikatorami dzięki regule najdłuższego
+dopasowania w lekserze.
 
 ### 2.3 Przypisanie strzałkowe „od lewej do prawej"
 
@@ -130,11 +143,46 @@ Dwa wspomniane wyjątki od LL(1) rozstrzygane są podglądem drugiego tokenu:
 2. **`->` przypisania kontra `->` anotacji typu zwracanego** w nagłówku
    `powolaj f(...) -> #:` — rozstrzygane kontekstem produkcji nagłówka funkcji.
 
-### 2.4 Odzyskiwanie po błędach
+### 2.4 Instrukcja `dopasuj` — gramatyka i reprezentacja w AST
+
+Dopasowanie wielogałęziowe ma postać:
+
+```
+dopasuj [wyrażenie]
+| literał_1 =>:
+    [instrukcje]
+| literał_2 =>:
+    [instrukcje]
+| inaczej =>:
+    [instrukcje]
+koniec
+```
+
+Produkcja jest w pełni LL(1): słowo kluczowe `dopasuj` jednoznacznie otwiera
+instrukcję, każdą gałąź otwiera token `|`, a rozróżnienie gałęzi literałowej
+od domyślnej sprowadza się do testu pojedynczego tokenu (`inaczej` kontra
+literał). Etykietą gałęzi może być **wyłącznie literał** — całkowity
+(opcjonalnie poprzedzony znakiem `-`, składanym przez parser do ujemnej
+stałej), napisowy lub logiczny (`prawda`/`falsz`); dowolne inne wyrażenie
+w pozycji etykiety jest błędem składniowym. Celem dopasowania jest natomiast
+pełnoprawne wyrażenie (np. `dopasuj #x % 2`), rozbierane standardową ścieżką
+Pratt parsingu.
+
+W AST instrukcję reprezentuje węzeł `MatchStatementNode` o trzech składowych:
+poddrzewie wyrażenia celu, wektorze przypadków (każdy przypadek to para
+*literał — blok instrukcji* wraz z lokalizacją źródłową dla diagnostyki) oraz
+**wyodrębnionym bloku domyślnym** `inaczej`. Wyodrębnienie to nie jest
+przypadkowe: gałąź `inaczej` jest **obowiązkowa** i musi być **ostatnia** —
+parser egzekwuje oba warunki (brak `inaczej`, gałąź po `inaczej` oraz
+zdublowane `inaczej` są osobnymi, precyzyjnymi błędami składniowymi), dzięki
+czemu dalsze fazy mogą traktować pokrycie wartości niedopasowanych jako
+inwariant strukturalny, a nie własność do każdorazowego dowodzenia.
+
+### 2.5 Odzyskiwanie po błędach
 
 Po wykryciu błędu składniowego parser przechodzi w tryb paniki i synchronizuje
 się do najbliższego tokenu niezawodnie rozpoczynającego lub zamykającego
-instrukcję (`powolaj`, `dopoki`, `<-`, `koniec`, `|`). Tokeny graniczne
+instrukcję (`powolaj`, `dopoki`, `dopasuj`, `<-`, `koniec`, `|`). Tokeny graniczne
 napotkane w pozycji błędnej są konsumowane przez samą procedurę instrukcji, co
 gwarantuje postęp i wyklucza zapętlenie; instrukcje rozebrane poprawnie po
 miejscu błędu trafiają do AST, dzięki czemu dalsze fazy diagnostyki pozostają
@@ -184,7 +232,7 @@ duplikaty nazw funkcji i parametrów oraz przesłanianie funkcji wbudowanych
 
 Kontrola typów jest **ścisła, bez jakichkolwiek konwersji niejawnych**:
 arytmetyka i porządek wymagają operandów całkowitych, równość — operandów
-jednego typu (dla napisów oznacza równość treści, §4.5), operatory logiczne —
+jednego typu (dla napisów oznacza równość treści, §4.6), operatory logiczne —
 operandów logicznych. Wynik wywołania funkcji bezzwrotnej (*void*) nie jest
 wartością i nie może wystąpić w żadnej pozycji wartościującej. Mechanizm
 tłumienia kaskad: wyrażenie, którego podwyrażenie zostało już zdiagnozowane,
@@ -200,6 +248,8 @@ przeprowadzana jest **analiza pokrycia ścieżek powrotu** (analiza
 konserwatywna, strukturalna): blok gwarantuje powrót, jeżeli zawiera
 instrukcję gwarantującą powrót; zapytanie `?` gwarantuje powrót wyłącznie
 wtedy, gdy obie gałęzie (`prawda` i `falsz`) są obecne i obie go gwarantują;
+instrukcja `dopasuj` gwarantuje powrót wyłącznie wtedy, gdy gwarantuje go
+**każdy** blok przypadku **oraz** obowiązkowy blok `inaczej` (§3.6);
 pętla `dopoki` nie gwarantuje nigdy (ciało może nie wykonać się ani razu).
 Funkcja niebezzwrotna, której ciało nie gwarantuje powrotu, jest odrzucana —
 wyklucza to na etapie kompilacji niezdefiniowane zachowanie „spadnięcia
@@ -213,7 +263,32 @@ Analizator dopuszcza ją wyłącznie w pozycji bezpośredniej wartości
 przypisania; użycie w głębi wyrażenia lub odczyt do zmiennej logicznej jest
 błędem. To jedyne miejsce języka, w którym typowanie jest kontekstowe, i jest
 ono celowo zawężone do wzorca trywialnie odwzorowywanego na wywołanie `scanf`
-z adresem szczeliny docelowej (§4.6).
+z adresem szczeliny docelowej (§4.7).
+
+### 3.6 Ograniczenia semantyczne instrukcji `dopasuj`
+
+Weryfikacja dopasowania wielogałęziowego obejmuje trzy klasy reguł:
+
+1. **Zgodność typu etykiet z celem.** Wyrażenie celu musi posiadać wartość
+   (wynik funkcji bezzwrotnej jest odrzucany), a jego typ statyczny — wyznaczony
+   sygilem (`#`, `$`, `?`) zgodnie z regułami §3.3 — staje się typem odniesienia
+   dla wszystkich etykiet: każdy literał przypadku musi mieć **dokładnie** ten
+   typ, bez żadnych konwersji (`dopasuj #x` z gałęzią `"jeden"` jest błędem
+   z komunikatem wskazującym oba typy).
+2. **Zakaz duplikatów.** Wartości etykiet w obrębie jednego `dopasuj` muszą być
+   parami różne; porównywana jest **wartość**, nie pisownia. Analizator prowadzi
+   zbiory wartości widzianych osobno dla każdego typu (zbiór liczb, zbiór
+   treści napisów, parę flag `prawda`/`falsz`), dzięki czemu wykrycie kolizji
+   jest liniowe względem liczby gałęzi. Duplikat byłby kodem martwym: przy
+   sekwencyjnym łańcuchu porównań (§4.5) druga gałąź o tej samej wartości jest
+   nieosiągalna, więc język odrzuca ją statycznie.
+3. **Pokrycie ścieżek powrotu.** W macierzy pokrycia (§3.4) `dopasuj` zachowuje
+   się analogicznie do zapytania o obu gałęziach: ponieważ przypadki literałowe
+   nigdy nie są traktowane jako wyczerpujące (dziedziny typów są praktycznie
+   nieskończone), gwarancja powrotu wymaga, by powrót gwarantował każdy blok
+   przypadku **i** blok `inaczej`. Obowiązkowość `inaczej`, wymuszona już
+   składniowo (§2.4), czyni tę regułę konserwatywną, lecz zupełną: nie istnieje
+   wartość celu, dla której sterowanie ominęłoby wszystkie bloki.
 
 ---
 
@@ -392,13 +467,61 @@ etykietami nazwanymi zgodnie ze składnią języka:
 Gałąź nieobecna w źródle pozostawia pusty segment między etykietami — wzorzec
 pozostaje jednolity, a `jmp .koniec_N` degeneruje się do skoku o zerowym
 dystansie semantycznym. Zagnieżdżone zapytania i pętle otrzymują kolejne
-numery `N`, więc etykiety nigdy nie kolidują. Operatory `&&`/`||` obniżane są
+numery `N`, więc etykiety nigdy nie kolidują. Operatory `i`/`lub` obniżane są
 bitowo (`and`/`or` na wartościach 0/1) — bez krótkiego spięcia; jest to
 udokumentowana decyzja semantyczna, bezpieczna, gdyż analizator dopuszcza
 operandy wyłącznie logiczne, a jedynym efektem ubocznym wyrażeń mogłoby być
 wejście/wyjście wewnątrz wołanej funkcji.
 
-### 4.5 Operacje na napisach
+### 4.5 Obniżanie instrukcji `dopasuj`: sekwencyjny łańcuch rozdzielczy
+
+Dopasowanie wielogałęziowe obniżane jest do **sekwencyjnego łańcucha
+rozdzielczego** (*dispatch chain*): wyrażenie celu wartościowane jest do `rax`
+**dokładnie raz**, po czym następuje seria porównań — po jednym na przypadek —
+zakończona skokiem bezwarunkowym do bloku domyślnego. Każda instrukcja
+otrzymuje unikatowy numer `N` z tego samego licznika, który numeruje zapytania
+i pętle, a przypadki — indeksy porządkowe `k`, co gwarantuje globalną
+unikatowość etykiet lokalnych również przy zagnieżdżaniu:
+
+```nasm
+    <wartościowanie celu do rax>      ; jednokrotne
+    cmp  rax, 1
+    je   .przypadek_N_0
+    cmp  rax, 42
+    je   .przypadek_N_1
+    jmp  .inaczej_N                   ; żaden literał nie pasuje
+.przypadek_N_0:
+    <instrukcje przypadku 0>
+    jmp  .koniec_dopasuj_N
+.przypadek_N_1:
+    <instrukcje przypadku 1>
+    jmp  .koniec_dopasuj_N
+.inaczej_N:
+    <instrukcje bloku domyślnego>
+.koniec_dopasuj_N:
+```
+
+Separacja strefy porównań od strefy bloków sprawia, że rejestr `rax` nie musi
+przetrwać wykonania żadnego ciała gałęzi — łańcuch `cmp`/`je` jest zwarty,
+a procesor wykonuje wyłącznie testy poprzedzające trafienie. Dla celów
+całkowitych i logicznych literał trafia do porównania jako argument
+natychmiastowy (`cmp rax, imm`); ponieważ koder x86_64 dopuszcza w tej formie
+wyłącznie 32-bitowy argument rozszerzany znakowo, literały spoza zakresu
+int32 są wstępnie ładowane do rejestru pomocniczego (`mov rcx, imm64`;
+`cmp rax, rcx`). Wartości logiczne porównywane są z ich materializacją 0/1.
+
+Cel napisowy wymaga porównania **treści**, spójnie z semantyką `==` (§4.6):
+każdy przypadek obniżany jest do wywołania `strcmp` z pełną sekwencją
+wyrównania stosu (§4.2). Ponieważ `strcmp` niszczy `rax`, wskaźnik celu jest
+na czas łańcucha **parkowany na stosie** (`push rax`); każda iteracja odtwarza
+go odczytem `mov rdi, [rsp]`, ładuje adres internowanego literału do `rsi`
+i testuje zerowość wyniku. Każdy blok gałęzi (w tym `inaczej`) osiągany jest
+przez dokładnie jedną etykietę, więc zdjęcie zaparkowanego słowa
+(`add rsp, 8`) emitowane na początku każdego bloku wykonuje się dokładnie raz
+na dowolnej ścieżce sterowania; powrót `<-` wewnątrz bloku pozostaje bezpieczny,
+gdyż epilog odtwarza `rsp` bezwzględnie z `rbp`, a nie relatywnie.
+
+### 4.6 Operacje na napisach
 
 Równość `==`/`!=` operandów napisowych obniżana jest do wywołania `strcmp`
 (z pełną sekwencją wyrównania §4.2) i materializacji predykatu
@@ -409,7 +532,7 @@ bezbłędowa wersja reguł typowania analizatora). Literały napisowe są
 **internowane**: identyczne stałe (w tym łańcuchy formatu `%lld`, `%s`,
 `%255s` oraz słowa `prawda`/`falsz`) współdzielą jedną definicję w `.rodata`.
 
-### 4.6 Funkcje wbudowane `pisz` i `bierz`
+### 4.7 Funkcje wbudowane `pisz` i `bierz`
 
 `pisz(a, b, …)` jest obniżane do **sekwencji niezależnych wywołań `printf`**,
 po jednym na argument, z łańcuchem formatu dobranym statycznie do typu
@@ -489,9 +612,135 @@ jedyne ograniczenie strukturalne backendu względem semantyki języka.
 | Deklaracja przez pierwsze przypisanie + sygile | typ widoczny w każdym użyciu; lokalna kontrola spójności |
 | Izolacja zakresów funkcji | przejrzystość referencyjna; zmienne globalne = lokalne `main` |
 | Analiza pokrycia ścieżek powrotu | eliminacja UB „spadnięcia z końca funkcji" w czasie kompilacji |
+| Operatory słownikowe `i`/`lub` | spójność z polską tożsamością języka; `&&`/`\|\|` jako czytelne błędy |
+| `dopasuj` z obowiązkowym `inaczej` | pokrycie wartości jako inwariant składniowy; brak duplikatów = brak kodu martwego |
+| Łańcuch rozdzielczy `cmp`/`je` | jednokrotne wartościowanie celu; etykiety lokalne odporne na zagnieżdżenia |
 | Jednorodny model qword | jeden rozmiar szczeliny; trywialny, deterministyczny przydział ramki |
 | Dynamiczne wyrównanie `rsp` przez `rbx` | bezwarunkowa zgodność z ABI niezależnie od głębokości wyrażenia |
 | Bool jako 0/1 + `setCC`/`cmove` | predykaty jako wartości pierwszej kategorii; wybór napisu bez skoków |
 | `strcmp` dla równości napisów | semantyka treści, nie tożsamości wskaźnika |
 | Prefiks `nurt_` symboli | brak kolizji z przestrzenią nazw libc |
 | Limit 6 parametrów | granica rejestrów INTEGER ABI; jasny komunikat zamiast cichej degradacji |
+
+---
+
+## 6. Metodologia i Wyniki Badań Empirycznych
+
+### 6.1 Cel i zakres badania
+
+Celem części empirycznej jest ilościowa charakterystyka kodu wynikowego
+generatora `nurtc` na tle referencyjnego kompilatora produkcyjnego. Jako
+punkt odniesienia przyjęto **GCC 15.2.0 z wyłączonymi optymalizacjami**
+(`-O0`), ponieważ dopiero ten poziom stanowi metodologicznie uczciwą bazę
+porównawczą: `nurtc` nie zawiera żadnej fazy optymalizacji (ani na poziomie
+reprezentacji pośredniej, ani podczas emisji), zatem zestawienie z `-O2`
+mierzyłoby przede wszystkim dorobek kilkudziesięciu lat inżynierii
+optymalizacyjnej GCC, a nie właściwości badanej architektury generatora.
+
+Porównano pięć par programów o **behawioralnie identycznej logice** —
+każdy algorytm zaimplementowano w Nurt (`.nrt`) i w C (`.c`), zachowując
+tę samą strukturę funkcji, pętli i rozgałęzień; równoważność weryfikowana
+jest automatycznie przez bajtowe porównanie strumieni wyjściowych obu
+binariów (bramka `output mismatch` w skrypcie pomiarowym):
+
+| Benchmark | Ćwiczone konstrukcje języka |
+| --- | --- |
+| `witaj` | bazowe I/O; odwzorowanie statycznego napisu w `.rodata` |
+| `euklides` | pętla `dopoki`, arytmetyka modulo, głęboka rekurencja (liczby Fibonacciego — najgorszy przypadek algorytmu Euklidesa) |
+| `kalkulator` | struktury warunkowe, porównania napisów, wielogałęziowa emisja `dopasuj` (łańcuch `strcmp` i łańcuch `cmp`/`je`) |
+| `liczba_pierwsza` | intensywna iteracja matematyczna (dzielenie próbne `d·d ≤ n`), logika stanu boolowskiego |
+| `rok_przestępny` | zagnieżdżone warunki złożone operatorami `i` / `lub` |
+
+### 6.2 Konfiguracja stanowiska i metodologia pomiaru
+
+Środowisko: WSL2 Ubuntu (jądro 6.6.114.1-microsoft-standard-WSL2),
+CPU Intel Core i5-9600KF @ 3,70 GHz (6 rdzeni), GCC 15.2.0, NASM 3.01,
+Python 3.14. Suite pomiarowy: `scripts/benchmark.py`; źródła i artefakty:
+katalog `benchmarks/`.
+
+Mierzone wielkości i procedury:
+
+1. **Statyczna liczba instrukcji i jej struktura.** Parsowane są pliki
+   asemblerowe obu kompilatorów (`.asm` — składnia Intel/NASM z `nurtc`;
+   `.s` — składnia AT&T z `gcc -O0 -S`). Zliczane są wyłącznie rozkazy
+   sprzętowe — etykiety, komentarze, dyrektywy asemblera i definicje
+   danych (`db`, `.string`, …) są wykluczone. Obok liczby całkowitej
+   raportowane są dwie klasy: **skoki/rozgałęzienia** (`jmp` oraz pełna
+   rodzina skoków warunkowych `je`, `jne`, `jl`, …) i **operacje
+   przesłań pamięciowo-rejestrowych** (`mov*`, `push`, `pop`).
+2. **Zajętość pamięci (RAM).** Każde binarium uruchamiane jest
+   **50-krotnie** pod kontrolą `/usr/bin/time -v`; raportowana jest
+   średnia wartość pola *Maximum resident set size* (kB).
+3. **Rozmiar pliku wykonywalnego.** Dokładny rozmiar w bajtach kopii
+   binarium poddanej `strip` (eliminacja tablic symboli wyrównuje
+   warunki: GCC domyślnie osadza więcej metadanych diagnostycznych).
+4. **Szybkość kompilacji.** Średni czas ścieżki *źródło → asembler*
+   (`nurtc plik.nrt -o plik.asm` vs `gcc -O0 -S`) z 30 powtórzeń po
+   3 przebiegach rozgrzewkowych (amortyzacja zimnych pamięci podręcznych
+   systemu plików). Porównywany jest ten właśnie etap, gdyż dalsze ogniwa
+   (asemblacja `nasm`, konsolidacja `gcc`) są wspólne dla obu potoków.
+
+### 6.3 Wyniki
+
+Pomiary z dnia 12.06.2026 (pełne tabele jednostkowe generuje
+`python3 scripts/benchmark.py`):
+
+| Benchmark | Instr. Nurt | Instr. C | Skoki N/C | Przesłania N/C | RSS Nurt [kB] | RSS C [kB] | Rozmiar Nurt [B] | Rozmiar C [B] | Kompilacja Nurt [ms] | Kompilacja C [ms] |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `witaj` | 19 | 15 | 0 / 0 | 10 / 8 | 1536 | 1664 | 14 408 | 14 464 | 9,47 | 25,23 |
+| `euklides` | 243 | 95 | 6 / 6 | 151 / 50 | 1664 | 1664 | 14 408 | 14 464 | 8,23 | 26,52 |
+| `kalkulator` | 682 | 290 | 22 / 21 | 382 / 141 | 1664 | 1664 | 14 416 | 14 464 | 9,03 | 32,83 |
+| `liczba_pierwsza` | 212 | 84 | 10 / 14 | 115 / 31 | 1664 | 1664 | 14 408 | 14 464 | 7,61 | 28,74 |
+| `rok_przestepny` | 265 | 124 | 4 / 15 | 136 / 44 | 1664 | 1664 | 14 408 | 14 464 | 8,15 | 29,57 |
+
+### 6.4 Analiza: koszty i zyski strategii stosowej
+
+**Gęstość instrukcji (2,1–2,6× więcej rozkazów).** Nadwyżka jest
+bezpośrednią, przewidywalną konsekwencją przyjętego w §4 modelu
+**akumulatorowo-stosowego bez alokatora rejestrów**: każdy wynik pośredni
+wyrażenia przechodzi cykl `push rax` / `pop rcx`, a każda zmienna żyje
+wyłącznie w szczelinie ramki, skąd jest ładowana przy każdym użyciu.
+Potwierdza to struktura nadwyżki — koncentruje się ona niemal w całości
+w klasie przesłań (`mov`/`push`/`pop`: 3,0–3,7× więcej), podczas gdy
+liczba skoków pozostaje porównywalna (1,0×), bo odwzorowanie struktur
+sterujących na rozkazy `cmp`+`jcc` jest w obu kompilatorach analogiczne.
+GCC nawet na `-O0` utrzymuje wyniki podwyrażeń w rejestrach w obrębie
+jednej instrukcji języka, stąd różnica.
+
+**Mniej rozgałęzień w logice boolowskiej.** W benchmarkach
+`rok_przestepny` (4 vs 15) i `liczba_pierwsza` (10 vs 14) Nurt emituje
+*mniej* skoków niż GCC. To mierzalny efekt decyzji z §3.3/§4: operatory
+`i`/`lub` są **wartościowane materializująco** (predykaty `setCC`
+łączone `and`/`or` jako wartości 0/1), podczas gdy C wymaga semantyki
+skróconej (*short-circuit*), którą GCC na `-O0` realizuje kaskadą skoków
+warunkowych. Kod Nurt ma w tych ścieżkach przepływ liniowy, przyjazny
+predykcji skoków — koszt: brak skracania wartościowania (w Nurt operandy
+logiczne są zawsze czyste, więc różnica nie jest obserwowalna
+semantycznie).
+
+**Pamięć i rozmiar binarium: parytet.** Średni szczytowy RSS (~1,6 MB)
+jest w granicach ziarnistości pomiaru identyczny — zdominowany przez
+mapowanie `libc` i stron startowych procesu, nie przez kod programu.
+Rozmiary binariów po `strip` różnią się o ułamek procenta (14 408–14 416 B
+vs 14 464 B): obie ścieżki linkują ten sam CRT i `libc` dynamicznie,
+a sekcje kodu obu wariantów mieszczą się w tych samych wyrównanych
+stronach ELF. Wniosek: nadwyżka instrukcji statycznych **nie propaguje
+się** na zajętość zasobów w tej klasie programów.
+
+**Szybkość kompilacji (3–4× szybciej).** Ścieżka `nurtc` źródło→asembler
+trwa średnio 7,6–9,5 ms wobec 25,2–32,8 ms GCC. To strukturalna premia
+prostoty: cztery fazy nad jednym AST, bez reprezentacji pośrednich
+(GIMPLE/RTL), bez passów optymalizacyjnych i bez kosztu inicjalizacji
+infrastruktury wielojęzykowego front-endu. Dla iteracyjnego cyklu
+edycja–kompilacja–test, istotnego dydaktycznie dla języka edukacyjnego,
+jest to właściwość pożądana.
+
+**Bilans.** Strategia stosowa kupuje *prostotę i weryfikowalność
+generatora* (deterministyczny przydział ramki §4.1, bezwarunkowa
+poprawność wyrównania ABI §4.2, trywialne dowodzenie poprawności emisji
+per-konstrukcja) płacąc gęstością kodu — kosztem statycznym, który w
+badanej klasie programów nie przekłada się ani na zajętość pamięci, ani
+na rozmiar artefaktu. Naturalnym kierunkiem dalszych prac jest liniowy
+alokator rejestrów (*linear scan*) nad istniejącą emisją, który
+zaadresowałby klasę przesłań — jedyną, w której kod Nurt ustępuje
+referencji.

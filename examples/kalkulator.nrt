@@ -1,30 +1,53 @@
-pisz("=== KALKULATOR NURT ===")
-pisz("Podaj pierwsza liczbe: ")
-bierz() -> #l1
-pisz("Podaj druga liczbe: ")
-bierz() -> #l2
+# kalkulator.nrt - prosty kalkulator zbudowany na instrukcji 'dopasuj'.
+# Demonstrates: string matching (strcmp chain), int matching (cmp/je chain),
+# the mandatory 'inaczej' branch, return path coverage through 'dopasuj',
+# and the keyword logical operators 'i' / 'lub'.
 
-pisz("Wybierz operacje (1-dodawanie, 2-odejmowanie, 3-mnozenie, 4-dzielenie): ")
-bierz() -> #operacja
-
-?operacja == 1 ?
-| prawda =>:
-    pisz("Wynik: ", #l1 + #l2)
-| falsz =>:
-    ?operacja == 2 ?
-    | prawda =>:
-        pisz("Wynik: ", #l1 - #l2)
-    | falsz =>:
-        ?operacja == 3 ?
+powolaj oblicz(#a, $op, #b) -> #:
+    dopasuj $op
+    | "+" =>:
+        <- #a + #b
+    | "-" =>:
+        <- #a - #b
+    | "*" =>:
+        <- #a * #b
+    | "/" =>:
+        #b == 0 ?
         | prawda =>:
-            pisz("Wynik: ", #l1 * #l2)
+            pisz("blad: dzielenie przez zero\n")
+            <- 0
         | falsz =>:
-            ?operacja == 4 ?
-            | prawda =>:
-                pisz("Wynik: ", #l1 / #l2)
-            | falsz =>:
-                pisz("Nieznana operacja!")
-            koniec
+            <- #a / #b
         koniec
+    | "%" =>:
+        <- #a % #b
+    | inaczej =>:
+        pisz("nieznany operator: ", $op, "\n")
+        <- 0
+    koniec
+koniec
+
+pisz("podaj pierwsza liczbe: ")
+bierz() -> #a
+pisz("podaj operator (+ - * / %): ")
+bierz() -> $op
+pisz("podaj druga liczbe: ")
+bierz() -> #b
+
+oblicz(#a, $op, #b) -> #wynik
+pisz(#a, " ", $op, " ", #b, " = ", #wynik, "\n")
+
+# Komentarz do wyniku: dopasowanie na liczbie.
+dopasuj #wynik
+| 0 =>:
+    pisz("wynik zerowy\n")
+| 42 =>:
+    pisz("odpowiedz na wszystko!\n")
+| inaczej =>:
+    #wynik > 0 i #wynik % 2 == 0 ?
+    | prawda =>:
+        pisz("wynik dodatni i parzysty\n")
+    | falsz =>:
+        pisz("wynik ujemny lub nieparzysty\n")
     koniec
 koniec

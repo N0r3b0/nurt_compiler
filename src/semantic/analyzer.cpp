@@ -1,5 +1,7 @@
 #include "semantic/analyzer.hpp"
 
+#include <cstdint>
+#include <unordered_set>
 #include <utility>
 
 namespace nurt {
@@ -105,6 +107,9 @@ void SemanticAnalyzer::analyzeStatement(const StatementNode& statement) {
         break;
     case NodeKind::IfStatement:
         analyzeIf(static_cast<const IfStatementNode&>(statement));
+        break;
+    case NodeKind::MatchStatement:
+        analyzeMatch(static_cast<const MatchStatementNode&>(statement));
         break;
     case NodeKind::While:
         analyzeWhile(static_cast<const WhileNode&>(statement));
@@ -266,6 +271,61 @@ void SemanticAnalyzer::analyzeIf(const IfStatementNode& node) {
     analyzeBlock(node.falseBranch);
 }
 
+void SemanticAnalyzer::analyzeMatch(const MatchStatementNode& node) {
+    const std::optional<Type> targetType =
+        requireValue(typeOf(*node.target), node.target->location, "the 'dopasuj' target");
+
+    std::unordered_set<std::int64_t> seenInts;
+    std::unordered_set<std::string> seenStrings;
+    bool seenPrawda = false;
+    bool seenFalsz = false;
+
+    for (const MatchCase& matchCase : node.cases) {
+        const ExpressionNode& literal = *matchCase.literal;
+        const std::optional<Type> literalType = typeOf(literal);  // literals never fail
+
+        if (targetType && literalType && *literalType != *targetType) {
+            error(matchCase.location, "'dopasuj' case type mismatch: the target is " +
+                                          typeDisplay(*targetType) + ", but this case literal is " +
+                                          typeDisplay(*literalType));
+        }
+
+        switch (literal.kind) {
+        case NodeKind::IntegerLiteral: {
+            const auto value = static_cast<const IntegerLiteralNode&>(literal).value;
+            if (!seenInts.insert(value).second) {
+                error(matchCase.location,
+                      "duplicate 'dopasuj' case '" + std::to_string(value) + "'");
+            }
+            break;
+        }
+        case NodeKind::StringLiteral: {
+            const auto& value = static_cast<const StringLiteralNode&>(literal).value;
+            if (!seenStrings.insert(value).second) {
+                error(matchCase.location, "duplicate 'dopasuj' case '\"" + value + "\"'");
+            }
+            break;
+        }
+        case NodeKind::BoolLiteral: {
+            const bool value = static_cast<const BoolLiteralNode&>(literal).value;
+            bool& seen = value ? seenPrawda : seenFalsz;
+            if (seen) {
+                error(matchCase.location, std::string("duplicate 'dopasuj' case '") +
+                                              (value ? "prawda" : "falsz") + "'");
+            }
+            seen = true;
+            break;
+        }
+        default:
+            break;
+        }
+
+        analyzeBlock(matchCase.body);
+    }
+
+    analyzeBlock(node.defaultBranch);
+}
+
 void SemanticAnalyzer::analyzeWhile(const WhileNode& node) {
     checkCondition(*node.condition, "'dopoki' loop");
     analyzeBlock(node.body);
@@ -394,7 +454,7 @@ std::optional<Type> SemanticAnalyzer::typeOfBinary(const BinaryNode& node) {
         return Type::Bool;
     }
 
-    // '&&' and '||'.
+    // 'i' and 'lub'.
     if (*lhs != Type::Bool || *rhs != Type::Bool) {
         error(node.location, "operator '" + std::string(opName) +
                                  "' requires bool (?) operands, got " + typeDisplay(*lhs) +
@@ -495,6 +555,18 @@ bool SemanticAnalyzer::statementAlwaysReturns(const StatementNode& statement) {
         // loops never guarantee a return.
         return !node.trueBranch.empty() && !node.falseBranch.empty() &&
                blockAlwaysReturns(node.trueBranch) && blockAlwaysReturns(node.falseBranch);
+    }
+    case NodeKind::MatchStatement: {
+        const auto& node = static_cast<const MatchStatementNode&>(statement);
+        // 'dopasuj' guarantees a return only when every case body AND the
+        // mandatory 'inaczej' branch guarantee one; the cases are never
+        // assumed exhaustive, the default covers the rest.
+        for (const MatchCase& matchCase : node.cases) {
+            if (!blockAlwaysReturns(matchCase.body)) {
+                return false;
+            }
+        }
+        return blockAlwaysReturns(node.defaultBranch);
     }
     default:
         return false;

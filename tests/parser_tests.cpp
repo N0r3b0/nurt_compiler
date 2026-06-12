@@ -176,13 +176,13 @@ TEST(ParserExpressions, ComparisonBindsLooserThanArithmetic) {
 }
 
 TEST(ParserExpressions, LogicalAndBindsTighterThanOr) {
-    const ParseResult result = parse("?a || ?b && ?c -> ?x");
+    const ParseResult result = parse("?a lub ?b i ?c -> ?x");
     EXPECT_EQ(result.errorCount, 0u);
 
     const auto* assignment = as<AssignmentNode>(result.program->statements.at(0));
     ASSERT_NE(assignment, nullptr);
 
-    // ?a || (?b && ?c)
+    // ?a lub (?b i ?c)
     const auto* orNode = as<BinaryNode>(assignment->value);
     ASSERT_NE(orNode, nullptr);
     EXPECT_EQ(orNode->op, BinaryOp::Or);

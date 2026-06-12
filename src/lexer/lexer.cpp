@@ -30,6 +30,9 @@ namespace {
         {"rob", TokenType::KwRob},
         {"prawda", TokenType::KwPrawda},
         {"falsz", TokenType::KwFalsz},
+        {"dopasuj", TokenType::KwDopasuj},
+        {"i", TokenType::KwI},
+        {"lub", TokenType::KwLub},
     };
     return table;
 }
@@ -118,12 +121,12 @@ Token Lexer::next() {
         return errorToken("stray '='; Nurt uses '->' for assignment and '==' for comparison");
     case '&':
         if (match('&')) {
-            return makeToken(TokenType::AmpAmp);
+            return errorToken("'&&' is not a Nurt operator; logical AND is the keyword 'i'");
         }
-        return errorToken("stray '&'; did you mean '&&'?");
+        return errorToken("stray '&'; logical AND is the keyword 'i'");
     case '|':
         if (match('|')) {
-            return makeToken(TokenType::PipePipe);
+            return errorToken("'||' is not a Nurt operator; logical OR is the keyword 'lub'");
         }
         return makeToken(TokenType::Pipe);
     default:

@@ -3,7 +3,7 @@ bierz() -> #l1
 pisz("\nPodaj druga liczbe: ")
 bierz() -> #l2
 
-#l1 == 1 && #l2 == 2 || #l1 == 3?
+#l1 == 1 i #l2 == 2 lub #l1 == 3?
 | prawda =>:
     pisz("\nprawda\n")
 | falsz =>:

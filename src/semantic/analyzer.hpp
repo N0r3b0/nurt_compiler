@@ -39,8 +39,13 @@ struct FunctionSymbol {
 ///    errors.
 ///  - **Expression typing**: arithmetic ('+ - * / %') and ordering
 ///    ('< <= > >=') require int operands; equality ('==' '!=') requires both
-///    operands to share one type; '&&'/'||'/'!' require bool; unary '-'
+///    operands to share one type; 'i'/'lub'/'!' require bool; unary '-'
 ///    requires int. Void call results cannot be used as values.
+///  - **'dopasuj' matching**: every case literal must have exactly the type of
+///    the matched target expression; duplicate case values within one
+///    'dopasuj' are errors; the mandatory 'inaczej' branch participates in
+///    return path coverage (a 'dopasuj' guarantees a return only when every
+///    case body and the 'inaczej' body guarantee one).
 ///  - **Statement typing**: an assigned expression must match the target
 ///    sigil; 'dopoki' and '?' query conditions must be bool; '<-' must match
 ///    the enclosing function's declared return type; non-void functions must
@@ -72,6 +77,7 @@ private:
     void analyzeExpressionStatement(const ExpressionStatementNode& node);
     void analyzeReturn(const ReturnNode& node);
     void analyzeIf(const IfStatementNode& node);
+    void analyzeMatch(const MatchStatementNode& node);
     void analyzeWhile(const WhileNode& node);
 
     /// Type-checks a 'dopoki' or '?' query condition; it must be bool.

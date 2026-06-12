@@ -36,10 +36,16 @@ namespace nurt {
 ///    many operands are pushed at that moment.
 ///  - '?' queries lower to 'cmp rax, 0' + 'je' with '.prawda_N/.falsz_N/
 ///    .koniec_N' labels; 'dopoki' loops use '.dopoki_N/.wyjscie_N'.
+///  - 'dopasuj' lowers to a sequential dispatch chain: the target evaluates
+///    into rax once, then each case emits 'cmp rax, <literal>' + 'je
+///    .przypadek_N_k' (int/bool; 64-bit literals go through rcx), falling
+///    through to 'jmp .inaczej_N'. String targets compare content: the target
+///    pointer is parked on the stack and each case calls strcmp. Bodies end
+///    with 'jmp .koniec_dopasuj_N'.
 ///  - 'pisz' prints each argument with printf by static type ('%lld', '%s',
 ///    or the words 'prawda'/'falsz'); 'bierz' scanfs '%lld' into the target
 ///    slot's address or '%255s' into the call site's buffer.
-///  - '&&'/'||' are bitwise on 0/1 values (no short-circuit; operands are
+///  - 'i'/'lub' are bitwise on 0/1 values (no short-circuit; operands are
 ///    already restricted to bools by the analyzer).
 ///
 /// The only structural limit is six parameters/arguments per function (the
@@ -86,6 +92,7 @@ private:
     void emitBierzAssignment(const AssignmentNode& node, const CallNode& call);
     void emitReturn(const ReturnNode& node);
     void emitIf(const IfStatementNode& node);
+    void emitMatch(const MatchStatementNode& node);
     void emitWhile(const WhileNode& node);
 
     // --- Expressions --------------------------------------------------------------------

@@ -243,9 +243,13 @@ TEST(SemanticOperators, EqualityRequiresMatchingTypes) {
 }
 
 TEST(SemanticOperators, LogicalOperatorsRequireBools) {
-    const AnalysisResult result = analyze("1 && 2 -> ?w");
+    const AnalysisResult result = analyze("1 i 2 -> ?w");
     EXPECT_EQ(result.semanticErrors, 1u);
-    EXPECT_TRUE(hasErrorContaining(result, "'&&' requires bool (?) operands"));
+    EXPECT_TRUE(hasErrorContaining(result, "'i' requires bool (?) operands"));
+
+    const AnalysisResult orResult = analyze("1 lub 2 -> ?w");
+    EXPECT_EQ(orResult.semanticErrors, 1u);
+    EXPECT_TRUE(hasErrorContaining(orResult, "'lub' requires bool (?) operands"));
 }
 
 TEST(SemanticOperators, UnaryOperators) {
@@ -485,6 +489,6 @@ TEST(SemanticProgram, MultipleErrorsAreAllReported) {
     const AnalysisResult result = analyze(
         "\"tekst\" -> #x\n"
         "#brak + 1 -> #y\n"
-        "1 && 2 -> ?w\n");
+        "1 i 2 -> ?w\n");
     EXPECT_EQ(result.semanticErrors, 3u);
 }
