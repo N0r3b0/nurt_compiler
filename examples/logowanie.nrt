@@ -1,0 +1,14 @@
+"sekretne_haslo123" -> $poprawne_haslo
+
+pisz("=== SYSTEM DOSTEPU ===\n")
+pisz("Podaj haslo: ")
+bierz() -> $wpisane_haslo
+
+$wpisane_haslo == $poprawne_haslo -> ?zgodne
+
+?zgodne ?
+| prawda =>:
+    pisz("DOSTEP PRZYZNANY. Witaj w systemie Nurt.")
+| falsz =>:
+    pisz("ODMOWA DOSTEPU. Haslo niepoprawne.")
+koniec

@@ -1,0 +1,61 @@
+# nwd.nrt - najwiekszy wspolny dzielnik (algorytm Euklidesa)
+# Benchmark for the full pipeline: functions, dopoki loops, ? queries,
+# modulo and subtraction variants, recursion, and pisz output.
+
+# Classic Euclid: remainders in a loop.
+powolaj nwd_modulo(#a, #b) -> #:
+    dopoki #b != 0 rob:
+        #a % #b -> #reszta
+        #b -> #a
+        #reszta -> #b
+    koniec
+    <- #a
+koniec
+
+# Original (subtraction-based) Euclid: loop + query + subtraction only.
+powolaj nwd_odejmowanie(#a, #b) -> #:
+    dopoki #a != #b rob:
+        #a > #b ?
+        | prawda =>:
+            #a - #b -> #a
+        | falsz =>:
+            #b - #a -> #b
+        koniec
+    koniec
+    <- #a
+koniec
+
+# Recursive Euclid, to exercise the call convention.
+powolaj nwd_rekurencja(#a, #b) -> #:
+    #b == 0 ?
+    | prawda =>:
+        <- #a
+    | falsz =>:
+        <- nwd_rekurencja(#b, #a % #b)
+    koniec
+koniec
+
+48 -> #x
+36 -> #y
+pisz("nwd_modulo(", #x, ", ", #y, ") = ", nwd_modulo(#x, #y), "\n")
+
+1071 -> #x
+462 -> #y
+pisz("nwd_odejmowanie(", #x, ", ", #y, ") = ", nwd_odejmowanie(#x, #y), "\n")
+
+270 -> #x
+192 -> #y
+pisz("nwd_rekurencja(", #x, ", ", #y, ") = ", nwd_rekurencja(#x, #y), "\n")
+
+# Cross-check: all three variants must agree.
+nwd_modulo(8126, 7344) -> #m
+nwd_odejmowanie(8126, 7344) -> #o
+nwd_rekurencja(8126, 7344) -> #r
+#m == #o && #o == #r -> ?zgodne
+
+?zgodne ?
+| prawda =>:
+    pisz("wszystkie warianty zgodne: nwd(8126, 7344) = ", #m, "\n")
+| falsz =>:
+    pisz("BLAD: warianty daja rozne wyniki!\n")
+koniec

@@ -1,0 +1,38 @@
+pisz("=== KALKULATOR NURT ===")
+pisz("Podaj pierwsza liczbe: ")
+bierz() -> #l1
+pisz("Podaj druga liczbe: ")
+bierz() -> #l2
+
+pisz("Wybierz operacje (1-dodawanie, 2-odejmowanie, 3-mnozenie, 4-dzielenie): ")
+bierz() -> #operacja
+
+# Porównujemy liczbę #operacja z liczbą 1. Wynik tego porównania da boola dla bloku query '?'
+#operacja == 1 ?
+| prawda =>:
+    pisz("Wynik: ", #l1 + #l2)
+    5 -> #operacja
+koniec
+    
+#operacja == 2 ?
+| prawda =>:
+    pisz("Wynik: ", #l1 - #l2)
+    5 -> #operacja
+koniec
+
+#operacja == 3 ?
+| prawda =>:
+    pisz("Wynik: ", #l1 * #l2)
+    5 -> #operacja
+koniec
+
+#operacja == 4 ?
+| prawda =>:
+    pisz("Wynik: ", #l1 / #l2)
+    5 -> #operacja
+koniec
+
+#operacja ==  5?
+| falsz =>:
+    pisz("Zła operacja")
+koniec

@@ -1,0 +1,3 @@
+Jeśli wybierzesz Nurt, Twoja praca magisterska może nosić podtytuł: "...na przykładzie języka Nurt o lewostronnym przepływie danych".
+
+Jeśli wybierzesz Zew, idealnie zakotwiczysz to w kodzie: "W języku Zew zamiast deklaracji funkcji używamy słowa powolaj...".

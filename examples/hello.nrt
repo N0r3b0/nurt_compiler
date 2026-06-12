@@ -1,0 +1,25 @@
+# hello.nrt - pierwszy program w jezyku Nurt
+# Demonstrates: functions, arrow assignment, sigils, loops, queries, builtins.
+
+powolaj suma(#a, #b) -> #:
+    #a + #b -> #wynik
+    <- #wynik
+koniec
+
+10 -> #x
+32 -> #y
+suma(#x, #y) -> #z      # z = 42
+
+dopoki #z > 0 rob:
+    #z - 1 -> #z
+koniec
+
+prawda -> ?gotowe
+"Witaj, Nurt!\n" -> $powitanie
+
+?gotowe ?
+| prawda =>:
+    pisz($powitanie)
+| falsz =>:
+    pisz("jeszcze nie...\n")
+koniec

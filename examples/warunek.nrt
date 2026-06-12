@@ -1,0 +1,11 @@
+pisz("Podaj pierwsza liczbe: ")
+bierz() -> #l1
+pisz("\nPodaj druga liczbe: ")
+bierz() -> #l2
+
+#l1 == 1 && #l2 == 2 || #l1 == 3?
+| prawda =>:
+    pisz("\nprawda\n")
+| falsz =>:
+    pisz("\nnieprawda\n")
+koniec

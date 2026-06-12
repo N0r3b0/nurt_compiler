@@ -1,2 +1,24 @@
+# Build directories
+build/
+out/
+cmake-build-*/
+
+# Object files and binaries
 *.o
-.vscode
+*.obj
+*.exe
+*.out
+*.asm.o
+
+# IDE / editor artifacts
+.vs/
+.vscode/
+.idea/
+*.user
+
+# CMake artifacts (in case of in-source configure by mistake)
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Testing/
